@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Bell, TrendingUp, Target, Zap, X, Eye } from 'lucide-react';
-import { Button } from '../ui/button';
-import { Badge } from '../ui/badge';
-import { Card, CardContent } from '../ui/card';
-import { TrendingArtist, Keyword } from '../../api/entities';
+import { Button } from './ui/button';
+import { Badge } from './ui/badge';
+import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
+import { TrendingArtist, Keyword } from '../api/entities';
 
 export function NotificationSystem() {
   const [notifications, setNotifications] = useState([]);
