@@ -4,8 +4,7 @@ import { Keyword } from '@/api/entities';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Compass, Search, Loader2, AlertCircle, TrendingUp, Eye } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Compass, Search, Loader2, TrendingUp, Eye } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 
@@ -326,13 +325,6 @@ export default function KeywordResearch() {
             </div>
           </CardContent>
         </Card>
-
-        {error && (
-          <Alert variant="destructive" className="bg-red-50 border-red-200 text-red-800">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
 
         {/* Results */}
         <div className="space-y-4">

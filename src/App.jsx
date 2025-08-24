@@ -1,6 +1,5 @@
 import './App.css'
 import Pages from "@/pages/index.jsx"
-import { Toaster } from "@/components/ui/toaster"
 import { useAutoDataCollector } from "@/hooks/useAutoDataCollector"
 
 function App() {
@@ -10,7 +9,6 @@ function App() {
   return (
     <>
       <Pages />
-      <Toaster />
     </>
   )
 }
