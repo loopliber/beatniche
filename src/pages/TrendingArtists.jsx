@@ -31,6 +31,7 @@ export default function TrendingArtists() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [dataSource, setDataSource] = useState('mixed');
+  const [usingMockData, setUsingMockData] = useState(false);
   const [filters, setFilters] = useState({
     competition: "all",
     momentum: "all",
@@ -101,6 +102,9 @@ export default function TrendingArtists() {
 
   const loadTrendingArtistsFromYouTube = async () => {
     try {
+      // Check if we're using mock data
+      setUsingMockData(youtubeAPI.useMockData);
+      
       // Search for currently trending type beat artists
       const trendingSearches = [
         'type beat 2024', 'type beat 2025', 'trending type beats',
@@ -117,6 +121,11 @@ export default function TrendingArtists() {
             order: 'viewCount',
             publishedAfter: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
           });
+          
+          // Update mock data status after first API call
+          if (youtubeAPI.useMockData && !usingMockData) {
+            setUsingMockData(true);
+          }
           
           // Extract artist names from titles
           results.items?.forEach(video => {
@@ -301,12 +310,18 @@ export default function TrendingArtists() {
             <div className="flex items-center gap-2 mt-2">
               <Badge variant="outline" className="text-xs">
                 <Youtube className="w-3 h-3 mr-1" />
-                {dataSource === 'youtube' ? 'Live YouTube Data' : 
+                {usingMockData ? '🎭 Demo Data' :
+                 dataSource === 'youtube' ? 'Live YouTube Data' : 
                  dataSource === 'database' ? 'Cached Data' : 'Fallback Data'}
               </Badge>
               <Badge variant="outline" className="text-xs">
                 {artists.length} Artists
               </Badge>
+              {usingMockData && (
+                <Badge variant="destructive" className="text-xs">
+                  API Unavailable
+                </Badge>
+              )}
             </div>
           </div>
           
@@ -323,6 +338,24 @@ export default function TrendingArtists() {
             Refresh Data
           </Button>
         </div>
+
+        {/* Mock Data Notice */}
+        {usingMockData && (
+          <Card className="border-orange-200 bg-orange-50 mb-6">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="text-2xl">🎭</div>
+                <div>
+                  <h3 className="font-semibold text-orange-800">Demo Mode Active</h3>
+                  <p className="text-sm text-orange-700">
+                    YouTube API is currently unavailable. Showing demo data for testing purposes. 
+                    The app functionality remains the same - this is just sample data.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">

@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { autoDataCollector } from '../services/AutoDataCollector';
+import { youtubeAPI } from '../api/youtubeClient';
 
 export function useAutoDataCollector() {
   useEffect(() => {
@@ -7,6 +8,13 @@ export function useAutoDataCollector() {
     const initializeCollector = async () => {
       try {
         console.log('🚀 Initializing Auto Data Collector...');
+        
+        // Check if YouTube API is available
+        if (!youtubeAPI.apiKey) {
+          console.warn('⚠️ YouTube API key not available, skipping auto data collection');
+          return;
+        }
+        
         await autoDataCollector.start();
         console.log('✅ Auto Data Collector started successfully');
       } catch (error) {
