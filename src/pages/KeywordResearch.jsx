@@ -28,127 +28,205 @@ export default function KeywordResearch() {
     setSearchedTerm(searchTerm);
 
     try {
-      // Search YouTube for related videos
-      const searchResults = await youtubeAPI.searchVideos(`${searchTerm} type beat`, {
-        maxResults: 50,
-        order: 'viewCount',
-        publishedAfter: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
-      });
+      // Search YouTube for videos related to the search term
+      const searchQueries = [
+        `${searchTerm} type beat`,
+        `${searchTerm} type beat 2024`,
+        `${searchTerm} type beat 2025`,
+        `${searchTerm} instrumental`,
+        `${searchTerm} x type beat`
+      ];
 
-      if (!searchResults.items || searchResults.items.length === 0) {
+      const allVideoDetails = [];
+      
+      // Search with multiple queries to get comprehensive results
+      for (const query of searchQueries) {
+        try {
+          const searchResults = await youtubeAPI.searchVideos(query, {
+            maxResults: 10,
+            order: 'viewCount',
+            publishedAfter: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString() // Last 60 days
+          });
+
+          if (searchResults.items && searchResults.items.length > 0) {
+            const videoIds = searchResults.items
+              .map(item => item.id.videoId)
+              .filter(Boolean);
+            
+            if (videoIds.length > 0) {
+              const details = await youtubeAPI.getVideoDetails(videoIds);
+              if (details.items) {
+                allVideoDetails.push(...details.items);
+              }
+            }
+          }
+        } catch (err) {
+          console.warn(`Failed to search for: ${query}`, err);
+        }
+      }
+
+      if (allVideoDetails.length === 0) {
         setError("No results found. Try a different keyword.");
         setIsLoading(false);
         return;
       }
 
-      // Get detailed stats for videos
-      const videoIds = searchResults.items.map(item => item.id.videoId).filter(Boolean);
-      const videoDetails = await youtubeAPI.getVideoDetails(videoIds.slice(0, 20));
-
-      // Analyze keywords from video titles and calculate metrics
+      // Analyze keywords from video titles
       const keywordMap = new Map();
+      const searchTermLower = searchTerm.toLowerCase();
       
-      videoDetails.items?.forEach(video => {
-        const title = video.snippet.title.toLowerCase();
+      allVideoDetails.forEach(video => {
+        const title = video.snippet.title;
+        const titleLower = title.toLowerCase();
         const views = parseInt(video.statistics?.viewCount || 0);
         const likes = parseInt(video.statistics?.likeCount || 0);
         const engagement = views > 0 ? (likes / views) * 100 : 0;
         
-        // Extract keyword variations
-        const patterns = [
-          new RegExp(`(\\w+(?:\\s+\\w+)?(?:\\s+x\\s+\\w+(?:\\s+\\w+)?)?)\\s+type\\s+beat`, 'gi'),
-          new RegExp(`${searchTerm}\\s+x\\s+(\\w+(?:\\s+\\w+)?)`, 'gi'),
-          new RegExp(`(\\w+(?:\\s+\\w+)?)\\s+x\\s+${searchTerm}`, 'gi')
-        ];
+        // Extract relevant keyword combinations
+        const keywordPatterns = [];
+        
+        // Check if title contains the search term
+        if (!titleLower.includes(searchTermLower)) {
+          return; // Skip if title doesn't contain our search term
+        }
 
-        patterns.forEach(pattern => {
-          let match;
-          while ((match = pattern.exec(title)) !== null) {
-            const keyword = match[0].trim();
-            if (keyword.length > 3 && keyword !== searchTerm) {
-              const current = keywordMap.get(keyword) || {
-                keyword,
-                videos: [],
-                totalViews: 0,
-                totalLikes: 0,
-                avgEngagement: 0,
-                count: 0
-              };
-              
-              current.videos.push({
-                title: video.snippet.title,
-                views,
-                likes,
-                channelTitle: video.snippet.channelTitle
-              });
-              current.totalViews += views;
-              current.totalLikes += likes;
-              current.avgEngagement = ((current.avgEngagement * current.count) + engagement) / (current.count + 1);
-              current.count++;
-              
-              keywordMap.set(keyword, current);
-            }
+        // Pattern 1: "artist type beat" or "artist instrumental"
+        if (titleLower.includes(`${searchTermLower} type beat`)) {
+          keywordPatterns.push(`${searchTerm} type beat`);
+        }
+        
+        // Pattern 2: "artist x other_artist type beat"
+        const collabPattern = new RegExp(`${searchTermLower}\\s+x\\s+([\\w\\s]+?)(?:\\s+type\\s+beat|\\s+instrumental)`, 'gi');
+        let collabMatch = collabPattern.exec(title);
+        if (collabMatch) {
+          keywordPatterns.push(`${searchTerm} x ${collabMatch[1].trim()} type beat`);
+        }
+
+        // Pattern 3: "other_artist x artist type beat"
+        const reverseCollabPattern = new RegExp(`([\\w\\s]+?)\\s+x\\s+${searchTermLower}(?:\\s+type\\s+beat|\\s+instrumental)`, 'gi');
+        let reverseMatch = reverseCollabPattern.exec(title);
+        if (reverseMatch) {
+          keywordPatterns.push(`${reverseMatch[1].trim()} x ${searchTerm} type beat`);
+        }
+
+        // Pattern 4: Style/mood variations (e.g., "dark central cee type beat")
+        const stylePattern = new RegExp(`(\\w+)\\s+${searchTermLower}\\s+type\\s+beat`, 'gi');
+        let styleMatch = stylePattern.exec(title);
+        if (styleMatch && !['free', 'new', '2024', '2025', '2023'].includes(styleMatch[1].toLowerCase())) {
+          keywordPatterns.push(`${styleMatch[1]} ${searchTerm} type beat`);
+        }
+
+        // Pattern 5: Genre specific (e.g., "central cee drill type beat")
+        const genreWords = ['drill', 'trap', 'melodic', 'hard', 'dark', 'chill', 'sad', 'aggressive', 'uk drill', 'ny drill', 'jersey', 'plugg', 'pluggnb'];
+        genreWords.forEach(genre => {
+          if (titleLower.includes(genre) && titleLower.includes(searchTermLower)) {
+            keywordPatterns.push(`${searchTerm} ${genre} type beat`);
+          }
+        });
+
+        // Add keywords to map with their metrics
+        keywordPatterns.forEach(keyword => {
+          if (keyword && keyword.length > 3) {
+            const current = keywordMap.get(keyword) || {
+              keyword,
+              videos: [],
+              totalViews: 0,
+              totalLikes: 0,
+              avgEngagement: 0,
+              count: 0
+            };
+            
+            current.videos.push({
+              title: video.snippet.title,
+              views,
+              likes,
+              channelTitle: video.snippet.channelTitle
+            });
+            current.totalViews += views;
+            current.totalLikes += likes;
+            current.avgEngagement = ((current.avgEngagement * current.count) + engagement) / (current.count + 1);
+            current.count++;
+            
+            keywordMap.set(keyword, current);
           }
         });
       });
 
-      // Also add the original search term
-      const mainKeywordViews = videoDetails.items?.reduce((sum, video) => 
-        sum + parseInt(video.statistics?.viewCount || 0), 0) || 0;
-      
-      keywordMap.set(searchTerm, {
-        keyword: searchTerm,
-        videos: videoDetails.items?.slice(0, 5).map(v => ({
-          title: v.snippet.title,
-          views: parseInt(v.statistics?.viewCount || 0),
-          likes: parseInt(v.statistics?.likeCount || 0),
-          channelTitle: v.snippet.channelTitle
-        })) || [],
-        totalViews: mainKeywordViews,
-        totalLikes: videoDetails.items?.reduce((sum, video) => 
-          sum + parseInt(video.statistics?.likeCount || 0), 0) || 0,
-        avgEngagement: 2.5,
-        count: videoDetails.items?.length || 0
-      });
+      // Always add the main search term if we have data for it
+      const mainSearchTerm = `${searchTerm} type beat`;
+      if (!keywordMap.has(mainSearchTerm)) {
+        const mainKeywordVideos = allVideoDetails
+          .filter(v => v.snippet.title.toLowerCase().includes(searchTermLower))
+          .slice(0, 5);
+        
+        if (mainKeywordVideos.length > 0) {
+          keywordMap.set(mainSearchTerm, {
+            keyword: mainSearchTerm,
+            videos: mainKeywordVideos.map(v => ({
+              title: v.snippet.title,
+              views: parseInt(v.statistics?.viewCount || 0),
+              likes: parseInt(v.statistics?.likeCount || 0),
+              channelTitle: v.snippet.channelTitle
+            })),
+            totalViews: mainKeywordVideos.reduce((sum, v) => sum + parseInt(v.statistics?.viewCount || 0), 0),
+            totalLikes: mainKeywordVideos.reduce((sum, v) => sum + parseInt(v.statistics?.likeCount || 0), 0),
+            avgEngagement: 2.5,
+            count: mainKeywordVideos.length
+          });
+        }
+      }
 
       // Convert to results format with calculated metrics
       const processedResults = Array.from(keywordMap.values())
+        .filter(data => data.count > 0) // Only include keywords with actual data
         .map(data => {
-          const avgViews = data.totalViews / Math.max(data.count, 1);
-          const competition = Math.min(100, (data.count / 10) * 100);
+          const avgViews = Math.floor(data.totalViews / data.count);
+          const competition = Math.min(100, (data.count / 5) * 100); // Adjusted scale
           const opportunity = calculateOpportunityScore(avgViews, competition, data.avgEngagement);
           
           return {
             keyword: data.keyword,
             volume: Math.floor(avgViews / 100), // Estimate monthly searches
-            avgViews: Math.floor(avgViews),
+            avgViews: avgViews,
             competition: competition,
             opportunity: opportunity,
             difficulty: competition > 70 ? 'High' : competition > 40 ? 'Medium' : 'Low',
             videos: data.videos.slice(0, 3),
-            engagement: data.avgEngagement.toFixed(2) + '%'
+            engagement: data.avgEngagement.toFixed(2) + '%',
+            videoCount: data.count
           };
         })
-        .sort((a, b) => b.opportunity - a.opportunity)
+        .sort((a, b) => {
+          // Prioritize exact matches, then sort by opportunity
+          const aExact = a.keyword.toLowerCase().startsWith(searchTermLower);
+          const bExact = b.keyword.toLowerCase().startsWith(searchTermLower);
+          if (aExact && !bExact) return -1;
+          if (!aExact && bExact) return 1;
+          return b.opportunity - a.opportunity;
+        })
         .slice(0, 15);
 
-      setResults(processedResults);
+      if (processedResults.length === 0) {
+        setError(`No relevant results found for "${searchTerm}". Try a different artist or keyword.`);
+      } else {
+        setResults(processedResults);
 
-      // Save to database if user is logged in
-      try {
-        for (const result of processedResults.slice(0, 5)) {
-          await Keyword.create({
-            keyword: result.keyword,
-            search_volume: result.volume,
-            competition_score: result.competition / 100,
-            opportunity_score: result.opportunity,
-            trend_direction: 'stable',
-            genre: detectGenre(result.keyword),
-            is_public: true
-          }).catch(() => {}); // Silently fail if duplicate
+        // Save to database
+        try {
+          for (const result of processedResults.slice(0, 5)) {
+            await Keyword.create({
+              keyword: result.keyword,
+              search_volume: result.volume,
+              competition_score: result.competition / 100,
+              opportunity_score: result.opportunity,
+              trend_direction: 'stable',
+              genre: detectGenre(result.keyword),
+              is_public: true
+            }).catch(() => {}); // Silently fail if duplicate
+          }
+        } catch (e) {
+          // Ignore database errors
         }
-      } catch (e) {
-        // Ignore database errors
       }
 
     } catch (e) {
@@ -174,6 +252,8 @@ export default function KeywordResearch() {
     if (lowerKeyword.includes('boom bap')) return 'boom-bap';
     if (lowerKeyword.includes('r&b') || lowerKeyword.includes('rnb')) return 'r&b';
     if (lowerKeyword.includes('afro')) return 'afrobeat';
+    if (lowerKeyword.includes('plugg')) return 'plugg';
+    if (lowerKeyword.includes('jersey')) return 'jersey';
     return 'hip-hop';
   };
 
