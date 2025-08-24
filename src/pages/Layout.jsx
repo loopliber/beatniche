@@ -23,6 +23,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { NotificationSystem, NotificationBell } from "@/components/NotificationSystem";
 
 const navigationItems = [
   {
@@ -161,9 +162,12 @@ export default function Layout({ children, currentPageName }) {
 
           <main className="flex-1 flex flex-col">
             <header className="bg-white/80 backdrop-blur-xl border-b border-gray-200/60 px-6 py-4 md:hidden">
-              <div className="flex items-center gap-4">
-                <SidebarTrigger className="hover:bg-gray-100 p-2 rounded-lg transition-colors duration-200" />
-                <h1 className="text-xl font-semibold text-gray-900">BeatFinder</h1>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <SidebarTrigger className="hover:bg-gray-100 p-2 rounded-lg transition-colors duration-200" />
+                  <h1 className="text-xl font-semibold text-gray-900">BeatFinder</h1>
+                </div>
+                <NotificationBell />
               </div>
             </header>
 
@@ -172,6 +176,9 @@ export default function Layout({ children, currentPageName }) {
             </div>
           </main>
         </div>
+        
+        {/* Notification System */}
+        <NotificationSystem />
       </SidebarProvider>
     </div>
   );
