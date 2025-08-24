@@ -19,6 +19,12 @@ class AutoDataCollector {
       return;
     }
     
+    // Check if YouTube API is available
+    if (!youtubeAPI.apiKey || youtubeAPI.useMockData) {
+      console.log('⚠️ YouTube API unavailable, skipping auto data collection');
+      return;
+    }
+    
     this.isRunning = true;
     console.log('🚀 Starting AutoDataCollector...');
     
@@ -43,6 +49,13 @@ class AutoDataCollector {
   async collectData() {
     if (this.isProcessing) {
       console.log('⏳ Data collection already in progress...');
+      return;
+    }
+
+    // Stop if YouTube API is unavailable
+    if (!youtubeAPI.apiKey || youtubeAPI.useMockData) {
+      console.log('⚠️ YouTube API unavailable, stopping auto data collection');
+      this.stop();
       return;
     }
 
@@ -332,7 +345,6 @@ class AutoDataCollector {
         
         return {
           name: artist.name,
-          artist_name: artist.name,
           trend_momentum: Math.round(momentum),
           competition_level: this.calculateCompetitionLevel(artist.videoCount),
           genre_primary: this.detectGenre(artist.name),

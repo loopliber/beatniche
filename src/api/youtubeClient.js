@@ -96,6 +96,11 @@ class YouTubeAPI {
   }
 
   async makeRequest(endpoint, params = {}) {
+    // If already using mock data, don't make real API calls
+    if (this.useMockData) {
+      return this.getMockData(endpoint, params);
+    }
+
     if (!this.apiKey) {
       console.warn('No YouTube API key found, using mock data');
       this.useMockData = true;
@@ -172,7 +177,38 @@ class YouTubeAPI {
       return { items };
     }
     
+    if (endpoint === 'videos') {
+      // Return mock video details
+      const items = [];
+      const ids = params.id ? params.id.split(',') : [];
+      
+      ids.forEach((id, index) => {
+        items.push({
+          id: id,
+          snippet: {
+            title: `Mock Video ${index + 1}`,
+            description: 'Mock video description',
+            channelTitle: `MockChannel${index + 1}`,
+            publishedAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(),
+          },
+          statistics: {
+            viewCount: Math.floor(Math.random() * 500000) + 1000,
+            likeCount: Math.floor(Math.random() * 25000) + 100,
+            commentCount: Math.floor(Math.random() * 1000) + 10
+          }
+        });
+      });
+      
+      return { items };
+    }
+    
     return mockData.searchVideos;
+  }
+
+  // Reset API state - useful for testing or when quotas reset
+  resetToRealAPI() {
+    this.useMockData = false;
+    console.log('🔄 YouTube API reset to use real API calls');
   }
 
   // Search for videos
