@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Keyword, TrendingArtist } from "@/api/entities";
+import { youtubeAnalytics } from "@/api/youtubeAnalytics";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
@@ -25,22 +26,64 @@ export default function Dashboard() {
   const [keywords, setKeywords] = useState([]);
   const [trendingArtists, setTrendingArtists] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [dataSource, setDataSource] = useState('mock');
 
   useEffect(() => {
     loadDashboardData();
   }, []);
 
   const loadDashboardData = async () => {
+    setIsLoading(true);
     try {
-      const [keywordData, artistData] = await Promise.all([
-        Keyword.list('-opportunity_score', 10),
-        TrendingArtist.list('-trend_momentum', 5)
+      // Try to load real YouTube data first, fallback to mock data
+      const [keywordData, artistData, youtubeKeywords, youtubeArtists] = await Promise.all([
+        Keyword.list('-opportunity_score', 10).catch(() => []),
+        TrendingArtist.list('-trend_momentum', 5).catch(() => []),
+        youtubeAnalytics.analyzeTrendingKeywords('', 5).catch(() => []),
+        youtubeAnalytics.findTrendingArtists(5).catch(() => [])
       ]);
       
-      setKeywords(keywordData);
-      setTrendingArtists(artistData);
+      // Combine real data with YouTube analysis
+      const allKeywords = [...keywordData];
+      if (youtubeKeywords.length > 0) {
+        setDataSource('youtube + mock');
+        // Add unique YouTube keywords
+        youtubeKeywords.forEach(yk => {
+          if (!allKeywords.find(k => k.keyword === yk.keyword)) {
+            allKeywords.push({
+              ...yk,
+              id: `yt-${Date.now()}-${Math.random()}`,
+              is_public: true,
+              created_at: new Date().toISOString()
+            });
+          }
+        });
+      }
+
+      const allArtists = [...artistData];
+      if (youtubeArtists.length > 0) {
+        // Add unique YouTube artists
+        youtubeArtists.forEach(ya => {
+          if (!allArtists.find(a => a.name.toLowerCase() === ya.name.toLowerCase())) {
+            allArtists.push({
+              ...ya,
+              id: `yt-${Date.now()}-${Math.random()}`,
+              created_at: new Date().toISOString()
+            });
+          }
+        });
+      }
+      
+      setKeywords(allKeywords.slice(0, 10));
+      setTrendingArtists(allArtists.slice(0, 5));
     } catch (error) {
       console.error('Error loading dashboard data:', error);
+      // Fallback to pure mock data
+      const mockKeywords = await Keyword.list('-opportunity_score', 10);
+      const mockArtists = await TrendingArtist.list('-trend_momentum', 5);
+      setKeywords(mockKeywords);
+      setTrendingArtists(mockArtists);
+      setDataSource('mock only');
     } finally {
       setIsLoading(false);
     }
@@ -48,14 +91,14 @@ export default function Dashboard() {
 
   const calculateStats = () => {
     const totalKeywords = keywords.length;
-    const highOpportunity = keywords.filter(k => k.opportunity_score > 70).length;
-    const avgCompetition = keywords.reduce((sum, k) => sum + k.competition_score, 0) / totalKeywords || 0;
-    const risingTrends = trendingArtists.filter(a => a.trend_momentum > 80).length;
+    const highOpportunity = keywords.filter(k => (k.opportunity_score || 0) > 70).length;
+    const avgCompetition = keywords.reduce((sum, k) => sum + (k.competition_score || 0), 0) / totalKeywords || 0;
+    const risingTrends = trendingArtists.filter(a => (a.trend_momentum || 0) > 80).length;
 
     return {
       totalKeywords,
       highOpportunity,
-      avgCompetition: Math.round(avgCompetition),
+      avgCompetition: Math.round(avgCompetition * 100),
       risingTrends
     };
   };
@@ -75,6 +118,17 @@ export default function Dashboard() {
               <p className="text-xl text-gray-600 font-medium">
                 Discover profitable type beat opportunities
               </p>
+              {/* Data source indicator */}
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <div className={`w-2 h-2 rounded-full ${
+                  dataSource.includes('youtube') ? 'bg-green-500' : 
+                  dataSource.includes('mock') ? 'bg-yellow-500' : 'bg-gray-400'
+                }`}></div>
+                Data source: {dataSource}
+                {dataSource.includes('youtube') && (
+                  <span className="text-green-600 font-medium">• Live YouTube data</span>
+                )}
+              </div>
             </div>
             <div className="flex gap-4 w-full md:w-auto">
               <Link to={createPageUrl("KeywordResearch")} className="flex-1 md:flex-none">
